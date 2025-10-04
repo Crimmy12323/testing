@@ -10,104 +10,98 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { createBrowserClient } from "@supabase/ssr"
 
-const initialScripts = [
-  {
-    id: 1,
-    name: "Infinite Yield",
-    category: "Admin",
-    description: "The most popular admin script for Roblox with hundreds of commands.",
-    rating: 4.9,
-    downloads: "1M+",
-    trending: true,
-    link: "https://example.com/infinite-yield",
-  },
-  {
-    id: 2,
-    name: "Dark Dex",
-    category: "Explorer",
-    description: "Advanced game explorer with detailed object inspection capabilities.",
-    rating: 4.8,
-    downloads: "500K+",
-    trending: false,
-    link: "https://example.com/dark-dex",
-  },
-  {
-    id: 3,
-    name: "Universal ESP",
-    category: "Visual",
-    description: "See players, items, and objects through walls in any game.",
-    rating: 4.6,
-    downloads: "750K+",
-    trending: true,
-    link: "https://example.com/universal-esp",
-  },
-  {
-    id: 4,
-    name: "Auto Farm",
-    category: "Automation",
-    description: "Automated farming script compatible with multiple popular games.",
-    rating: 4.5,
-    downloads: "600K+",
-    trending: false,
-    link: "https://example.com/auto-farm",
-  },
-  {
-    id: 5,
-    name: "Speed Hack",
-    category: "Movement",
-    description: "Increase your character's movement speed in any game.",
-    rating: 4.3,
-    downloads: "400K+",
-    trending: false,
-    link: "https://example.com/speed-hack",
-  },
-  {
-    id: 6,
-    name: "Fly Script",
-    category: "Movement",
-    description: "Universal fly script that works in most Roblox games.",
-    rating: 4.7,
-    downloads: "850K+",
-    trending: true,
-    link: "https://example.com/fly-script",
-  },
-]
+const supabase = createBrowserClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
 
 export default function Scripts() {
   const { isAdmin } = useAuth()
-  const [scripts, setScripts] = useState(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("scripts")
-      return saved ? JSON.parse(saved) : initialScripts
-    }
-    return initialScripts
-  })
+  const [scripts, setScripts] = useState<any[]>([])
   const [editingScript, setEditingScript] = useState<any>(null)
   const [showAddDialog, setShowAddDialog] = useState(false)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem("scripts", JSON.stringify(scripts))
-    }
-  }, [scripts])
+    fetchScripts()
+  }, [])
 
-  const handleDelete = (id: number) => {
-    setScripts(scripts.filter((s) => s.id !== id))
+  const fetchScripts = async () => {
+    try {
+      const { data, error } = await supabase.from("scripts").select("*").order("created_at", { ascending: false })
+
+      if (error) throw error
+      setScripts(data || [])
+    } catch (error) {
+      console.error("[v0] Error fetching scripts:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleDelete = async (id: number) => {
+    try {
+      const { error } = await supabase.from("scripts").delete().eq("id", id)
+
+      if (error) throw error
+      setScripts(scripts.filter((s) => s.id !== id))
+    } catch (error) {
+      console.error("[v0] Error deleting script:", error)
+    }
   }
 
   const handleEdit = (script: any) => {
     setEditingScript({ ...script })
   }
 
-  const handleSave = () => {
-    if (editingScript.id) {
-      setScripts(scripts.map((s) => (s.id === editingScript.id ? editingScript : s)))
-    } else {
-      setScripts([...scripts, { ...editingScript, id: Date.now() }])
+  const handleSave = async () => {
+    try {
+      if (editingScript.id) {
+        const { error } = await supabase
+          .from("scripts")
+          .update({
+            name: editingScript.name,
+            category: editingScript.category,
+            description: editingScript.description,
+            rating: editingScript.rating,
+            downloads: editingScript.downloads,
+            trending: editingScript.trending,
+            link: editingScript.link,
+          })
+          .eq("id", editingScript.id)
+
+        if (error) throw error
+        setScripts(scripts.map((s) => (s.id === editingScript.id ? editingScript : s)))
+      } else {
+        const { data, error } = await supabase
+          .from("scripts")
+          .insert({
+            name: editingScript.name,
+            category: editingScript.category,
+            description: editingScript.description,
+            rating: editingScript.rating,
+            downloads: editingScript.downloads,
+            trending: editingScript.trending,
+            link: editingScript.link,
+          })
+          .select()
+          .single()
+
+        if (error) throw error
+        setScripts([data, ...scripts])
+      }
+      setEditingScript(null)
+      setShowAddDialog(false)
+    } catch (error) {
+      console.error("[v0] Error saving script:", error)
     }
-    setEditingScript(null)
-    setShowAddDialog(false)
+  }
+
+  if (loading) {
+    return (
+      <div className="max-w-[1400px] mx-auto px-6 py-8">
+        <div className="text-center text-gray-400">Loading scripts...</div>
+      </div>
+    )
   }
 
   return (
@@ -140,44 +134,40 @@ export default function Scripts() {
           >
             <div className="absolute -inset-2 bg-purple-600 rounded-xl blur-xl opacity-0 group-hover:opacity-50 transition-opacity duration-700" />
 
-            <Card className="relative bg-[#1a1a24] border-gray-800 hover:border-purple-600/50 transition-all h-full flex flex-col">
-              <CardContent className="p-4 flex flex-col flex-1">
+            <Card className="relative bg-[#1a1a24] border-gray-800 hover:border-purple-600/50 transition-all h-[200px] flex flex-col">
+              <CardContent className="p-3 flex flex-col h-full">
                 <div className="flex items-start justify-between mb-1">
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-white font-bold text-lg mb-1 truncate group-hover:text-purple-400 transition-colors">
-                      {script.name}
-                    </h3>
-                    <Badge
-                      variant="secondary"
-                      className="bg-purple-600/20 text-purple-400 border-purple-600/30 text-xs"
-                    >
-                      {script.category}
-                    </Badge>
+                  <h3 className="text-white font-bold text-lg truncate flex-1 group-hover:text-purple-400 transition-colors">
+                    {script.name}
+                  </h3>
+                  <div className="flex items-center gap-1 ml-2">
+                    <Star className="w-4 h-4 text-yellow-400 fill-yellow-400" />
+                    <span className="text-white font-semibold text-sm">{script.rating}</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 mb-2">
+                  <Badge
+                    variant="secondary"
+                    className="bg-purple-600/30 text-purple-300 border-purple-600/50 text-xs font-semibold"
+                  >
+                    {script.category}
+                  </Badge>
+                  <div className="flex items-center gap-1 text-xs text-gray-400">
+                    <Download className="w-3 h-3" />
+                    <span>{script.downloads}</span>
                   </div>
                   {script.trending && (
-                    <div className="flex items-center gap-1 text-xs text-orange-400 ml-2">
+                    <div className="flex items-center gap-1 text-xs text-orange-400">
                       <TrendingUp className="w-3 h-3" />
                       <span>Hot</span>
                     </div>
                   )}
                 </div>
 
-                <p className="text-gray-400 text-xs mb-3 line-clamp-2 flex-1">{script.description}</p>
+                <p className="text-gray-400 text-xs mb-2 line-clamp-2 flex-1">{script.description}</p>
 
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-3 text-xs text-gray-500">
-                    <div className="flex items-center gap-1">
-                      <Star className="w-3 h-3 text-yellow-400 fill-yellow-400" />
-                      <span className="text-white">{script.rating}</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Download className="w-3 h-3" />
-                      <span>{script.downloads}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-auto pt-8">
+                <div className="mt-auto pt-6">
                   {isAdmin ? (
                     <div className="flex gap-2">
                       <Button

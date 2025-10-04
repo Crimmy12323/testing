@@ -3,14 +3,14 @@ import { createContext, useContext, useState, useEffect, type ReactNode } from "
 
 interface AuthContextType {
   isAdmin: boolean
-  login: (username: string, password: string) => boolean
+  login: (username: string, password: string) => Promise<boolean>
   logout: () => void
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 const ADMIN_USERNAME = "npcraftin"
-const ADMIN_PASSWORD = "6dad9b569619ce0582bc368fb9bedce2f02c0297dc560a09bac5a0731e57cb00"
+const ADMIN_PASSWORD_HASH = "6dad9b569619ce0582bc368fb9bedce2f02c0297dc560a09bac5a0731e57cb00"
 
 async function hashPassword(password: string): Promise<string> {
   const encoder = new TextEncoder()
@@ -40,9 +40,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const login = async (username: string, password: string): Promise<boolean> => {
-    const hashedPassword = await hashPassword(password)
+    let passwordToCheck = password
+    if (password.length !== 64) {
+      // Not a hash, so hash it
+      passwordToCheck = await hashPassword(password)
+    }
 
-    if (username === ADMIN_USERNAME && hashedPassword === ADMIN_PASSWORD) {
+    if (username === ADMIN_USERNAME && passwordToCheck === ADMIN_PASSWORD_HASH) {
       setIsAdmin(true)
       sessionStorage.setItem("isAdmin", "true")
       sessionStorage.setItem("loginTime", Date.now().toString())

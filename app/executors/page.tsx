@@ -10,73 +10,109 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { createBrowserClient } from "@supabase/ssr"
 
-const initialExecutors = [
-  {
-    id: 1,
-    name: "Solara",
-    description: "Premium executor with advanced features and regular updates.",
-    rating: 4.8,
-    status: "Free",
-    isPaid: false,
-    unc: 95,
-    sunc: 92,
-    features: ["Level 8 execution", "Custom UI", "Script hub", "Auto-update", "24/7 support"],
-    link: "https://example.com/solara",
-    videoUrl: "",
-    imageUrl: "",
-  },
-  {
-    id: 2,
-    name: "Synapse X",
-    description: "Industry-leading executor with unmatched stability and performance.",
-    rating: 4.9,
-    status: "Premium",
-    isPaid: true,
-    unc: 98,
-    sunc: 96,
-    features: ["Level 9 execution", "Decompiler", "Script editor", "Premium support"],
-    link: "https://example.com/synapse-x",
-    videoUrl: "",
-    imageUrl: "",
-  },
-]
+const supabase = createBrowserClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
 
 export default function RobloxExecutors() {
   const { isAdmin } = useAuth()
-  const [executors, setExecutors] = useState(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("executors")
-      return saved ? JSON.parse(saved) : initialExecutors
-    }
-    return initialExecutors
-  })
+  const [executors, setExecutors] = useState<any[]>([])
   const [editingExecutor, setEditingExecutor] = useState<any>(null)
   const [showAddDialog, setShowAddDialog] = useState(false)
   const [showcaseExecutor, setShowcaseExecutor] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem("executors", JSON.stringify(executors))
-    }
-  }, [executors])
+    fetchExecutors()
+  }, [])
 
-  const handleDelete = (id: number) => {
-    setExecutors(executors.filter((e: any) => e.id !== id))
+  const fetchExecutors = async () => {
+    try {
+      const { data, error } = await supabase.from("executors").select("*").order("created_at", { ascending: false })
+
+      if (error) throw error
+      setExecutors(data || [])
+    } catch (error) {
+      console.error("[v0] Error fetching executors:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleDelete = async (id: number) => {
+    try {
+      const { error } = await supabase.from("executors").delete().eq("id", id)
+
+      if (error) throw error
+      setExecutors(executors.filter((e: any) => e.id !== id))
+    } catch (error) {
+      console.error("[v0] Error deleting executor:", error)
+    }
   }
 
   const handleEdit = (executor: any) => {
     setEditingExecutor({ ...executor })
   }
 
-  const handleSave = () => {
-    if (editingExecutor.id) {
-      setExecutors(executors.map((e: any) => (e.id === editingExecutor.id ? editingExecutor : e)))
-    } else {
-      setExecutors([...executors, { ...editingExecutor, id: Date.now() }])
+  const handleSave = async () => {
+    try {
+      if (editingExecutor.id) {
+        // Update existing
+        const { error } = await supabase
+          .from("executors")
+          .update({
+            name: editingExecutor.name,
+            description: editingExecutor.description,
+            rating: editingExecutor.rating,
+            status: editingExecutor.status,
+            is_paid: editingExecutor.isPaid,
+            unc: editingExecutor.unc,
+            sunc: editingExecutor.sunc,
+            features: editingExecutor.features,
+            link: editingExecutor.link,
+            video_url: editingExecutor.videoUrl,
+            image_url: editingExecutor.imageUrl,
+          })
+          .eq("id", editingExecutor.id)
+
+        if (error) throw error
+        setExecutors(executors.map((e: any) => (e.id === editingExecutor.id ? editingExecutor : e)))
+      } else {
+        // Insert new
+        const { data, error } = await supabase
+          .from("executors")
+          .insert({
+            name: editingExecutor.name,
+            description: editingExecutor.description,
+            rating: editingExecutor.rating,
+            status: editingExecutor.status,
+            is_paid: editingExecutor.isPaid,
+            unc: editingExecutor.unc,
+            sunc: editingExecutor.sunc,
+            features: editingExecutor.features,
+            link: editingExecutor.link,
+            video_url: editingExecutor.videoUrl,
+            image_url: editingExecutor.imageUrl,
+          })
+          .select()
+          .single()
+
+        if (error) throw error
+        setExecutors([data, ...executors])
+      }
+      setEditingExecutor(null)
+      setShowAddDialog(false)
+    } catch (error) {
+      console.error("[v0] Error saving executor:", error)
     }
-    setEditingExecutor(null)
-    setShowAddDialog(false)
+  }
+
+  if (loading) {
+    return (
+      <div className="max-w-[1400px] mx-auto px-6 py-8">
+        <div className="text-center text-gray-400">Loading executors...</div>
+      </div>
+    )
   }
 
   return (
@@ -127,47 +163,46 @@ export default function RobloxExecutors() {
           >
             <div className="absolute -inset-2 bg-purple-600 rounded-xl blur-xl opacity-0 group-hover:opacity-50 transition-opacity duration-700" />
 
-            <Card className="relative bg-[#1a1a24] border-gray-800 hover:border-purple-600/50 transition-all h-full flex flex-col">
-              <CardContent className="p-4 flex flex-col flex-1">
+            <Card className="relative bg-[#1a1a24] border-gray-800 hover:border-purple-600/50 transition-all h-[340px] flex flex-col">
+              <CardContent className="p-3 flex flex-col h-full">
                 <div className="flex items-start justify-between mb-1">
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-white font-bold text-lg mb-0.5 truncate">{executor.name}</h3>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <Badge
-                        variant="secondary"
-                        className={
-                          executor.isPaid
-                            ? "bg-yellow-600/20 text-yellow-400 border-yellow-600/30 text-xs"
-                            : "bg-green-600/20 text-green-400 border-green-600/30 text-xs"
-                        }
-                      >
-                        {executor.status}
-                      </Badge>
-                      <span className="text-xs text-gray-400 whitespace-nowrap">
-                        {executor.unc}% UNC / {executor.sunc}% SUNC
-                      </span>
-                    </div>
-                  </div>
+                  <h3 className="text-white font-bold text-lg truncate flex-1">{executor.name}</h3>
                   <div className="flex items-center gap-1 ml-2">
-                    <Star className="w-3 h-3 text-yellow-400 fill-yellow-400" />
+                    <Star className="w-4 h-4 text-yellow-400 fill-yellow-400" />
                     <span className="text-white font-semibold text-sm">{executor.rating}</span>
                   </div>
                 </div>
 
-                {executor.imageUrl && (
-                  <div className="mb-3 rounded-lg overflow-hidden">
+                <div className="flex items-center gap-2 mb-2">
+                  <Badge
+                    variant="secondary"
+                    className={
+                      executor.is_paid
+                        ? "bg-yellow-600/30 text-yellow-300 border-yellow-600/50 text-xs font-semibold"
+                        : "bg-green-600/30 text-green-300 border-green-600/50 text-xs font-semibold"
+                    }
+                  >
+                    {executor.is_paid ? "Premium" : "Free"}
+                  </Badge>
+                  <span className="text-xs text-gray-400">
+                    {executor.unc}% UNC / {executor.sunc}% SUNC
+                  </span>
+                </div>
+
+                {executor.image_url && (
+                  <div className="mb-2 rounded-lg overflow-hidden">
                     <img
-                      src={executor.imageUrl || "/placeholder.svg"}
+                      src={executor.image_url || "/placeholder.svg"}
                       alt={executor.name}
-                      className="w-full h-32 object-cover"
+                      className="w-full h-20 object-cover"
                     />
                   </div>
                 )}
 
-                <p className="text-gray-400 text-xs mb-3 line-clamp-2 flex-shrink-0">{executor.description}</p>
+                <p className="text-gray-400 text-xs mb-2 line-clamp-2">{executor.description}</p>
 
-                <div className="space-y-1.5 mb-4 flex-1 mt-3">
-                  {executor.features.slice(0, 3).map((feature: string, idx: number) => (
+                <div className="space-y-0.5 mb-2 flex-1">
+                  {executor.features?.slice(0, 3).map((feature: string, idx: number) => (
                     <div key={idx} className="flex items-center gap-2 text-xs">
                       <Shield className="w-3 h-3 text-purple-400 flex-shrink-0" />
                       <span className="text-gray-400 truncate">{feature}</span>
@@ -202,7 +237,7 @@ export default function RobloxExecutors() {
                         <Download className="w-3 h-3 mr-1" />
                         Get Executor
                       </Button>
-                      {(executor.videoUrl || executor.imageUrl) && (
+                      {(executor.video_url || executor.image_url) && (
                         <Button
                           onClick={() => setShowcaseExecutor(executor)}
                           className="w-full bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/30 backdrop-blur-sm text-xs h-8"
@@ -260,7 +295,7 @@ export default function RobloxExecutors() {
             <div>
               <Label>Video URL (optional)</Label>
               <Input
-                value={editingExecutor?.videoUrl || ""}
+                value={editingExecutor?.videoUrl || editingExecutor?.video_url || ""}
                 onChange={(e) => setEditingExecutor({ ...editingExecutor, videoUrl: e.target.value })}
                 placeholder="https://youtube.com/watch?v=..."
                 className="bg-[#0f0f17] border-gray-700"
@@ -269,7 +304,7 @@ export default function RobloxExecutors() {
             <div>
               <Label>Image URL (optional)</Label>
               <Input
-                value={editingExecutor?.imageUrl || ""}
+                value={editingExecutor?.imageUrl || editingExecutor?.image_url || ""}
                 onChange={(e) => setEditingExecutor({ ...editingExecutor, imageUrl: e.target.value })}
                 placeholder="https://example.com/image.png"
                 className="bg-[#0f0f17] border-gray-700"
@@ -360,18 +395,18 @@ export default function RobloxExecutors() {
             <DialogTitle>{showcaseExecutor?.name} Showcase</DialogTitle>
           </DialogHeader>
           <div className="mt-4">
-            {showcaseExecutor?.videoUrl ? (
+            {showcaseExecutor?.video_url ? (
               <div className="aspect-video">
                 <iframe
-                  src={showcaseExecutor.videoUrl.replace("watch?v=", "embed/")}
+                  src={showcaseExecutor.video_url.replace("watch?v=", "embed/")}
                   className="w-full h-full rounded-lg"
                   allowFullScreen
                   title={`${showcaseExecutor.name} showcase`}
                 />
               </div>
-            ) : showcaseExecutor?.imageUrl ? (
+            ) : showcaseExecutor?.image_url ? (
               <img
-                src={showcaseExecutor.imageUrl || "/placeholder.svg"}
+                src={showcaseExecutor.image_url || "/placeholder.svg"}
                 alt={`${showcaseExecutor.name} showcase`}
                 className="w-full rounded-lg"
               />
